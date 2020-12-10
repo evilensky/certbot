@@ -3,6 +3,8 @@ import logging
 
 import CloudFlare
 import zope.interface
+import dns.resolver
+import dns.exception
 
 from acme.magic_typing import Any
 from acme.magic_typing import Dict
@@ -92,6 +94,18 @@ class _CloudflareClient(object):
 
     def __init__(self, email, api_key):
         self.cf = CloudFlare.CloudFlare(email, api_key)
+
+    def dereference_cname(self, domain, validation_name):
+        validation_fqdn = "{}.{}".format(validation_name, domain)
+        try:
+            answer = dns.resolver.resolve(validation_fqdn)
+        except dns.exception.DNSException as e:
+            logger.debug('Error resolving dns name {}'.format(e))
+        answer = answer.canonical_name.to_text()
+        if validation_fqdn == answer:
+            return domain
+        elif validation_fqdn != answer:
+            return answer.split("{}.".format(validation_name))[1]
 
     def add_txt_record(self, domain, record_name, record_content, record_ttl):
         """
