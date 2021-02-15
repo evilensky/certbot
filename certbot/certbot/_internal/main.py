@@ -1393,7 +1393,7 @@ def main(cli_args=None):
 
     # On windows, shell without administrative right cannot create symlinks required by certbot.
     # So we check the rights before continuing.
-    misc.raise_for_non_administrative_windows_rights()
+    misc.raise_for_no_secreatesymboliclink_privilege()
 
     try:
         log.post_arg_parse_setup(config)

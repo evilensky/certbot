@@ -15,7 +15,10 @@ from certbot.compat import os
 from acme.magic_typing import Tuple, Optional
 
 try:
-    from win32com.shell import shell as shellwin32
+    import win32api
+    import win32security
+    import win32con
+    from ntsecuritycon import *
     POSIX_MODE = False
 except ImportError:  # pragma: no cover
     POSIX_MODE = True
@@ -27,17 +30,25 @@ logger = logging.getLogger(__name__)
 STANDARD_BINARY_DIRS = ["/usr/sbin", "/usr/local/bin", "/usr/local/sbin"] if POSIX_MODE else []
 
 
-def raise_for_non_administrative_windows_rights():
+def raise_for_no_secreatesymboliclink_privilege():
     # type: () -> None
     """
-    On Windows, raise if current shell does not have the administrative rights.
+    On Windows, raise if current shell does not have create symbolic link privilege.
     Do nothing on Linux.
 
-    :raises .errors.Error: If the current shell does not have administrative rights on Windows.
+    :raises .errors.Error: If the current shell does not have symbolic link privileges on Windows.
     """
-    if not POSIX_MODE and shellwin32.IsUserAnAdmin() == 0:  # pragma: no cover
-        raise errors.Error('Error, certbot must be run on a shell with administrative rights.')
-
+    if not POSIX_MODE:
+        tokenhandle = win32security.OpenProcessToken(
+            win32api.GetCurrentProcess(), win32con.TOKEN_QUERY
+            )
+        privileges = win32security.GetTokenInformation(
+            tokenhandle, TokenPrivileges
+            )
+        if 'SeCreateSymbolicLinkPrivilege' not in [
+            win32security.LookupPrivilegeName(None, priv) for priv, flag in privileges
+            ]:
+            raise errors.Error('Error, certbot must be run by a user with "Create symbolic link privileges"')
 
 def readline_with_timeout(timeout, prompt):
     # type: (float, str) -> str
